@@ -13,14 +13,15 @@ import tg_bot.modules.sql.locks_sql as sql
 from tg_bot import dispatcher, SUDO_USERS, LOGGER
 from tg_bot.modules.disable import DisableAbleCommandHandler
 from tg_bot.modules.helper_funcs.chat_status import can_delete, is_user_admin, user_not_admin, user_admin, \
-    bot_can_delete, is_bot_admin
+    bot_can_delete, is_bot_admin, is_user_in_chat
+from tg_bot.modules.helper_funcs.filters import CustomFilters
 from tg_bot.modules.log_channel import loggable
 from tg_bot.modules.sql import users_sql
 
 LOCK_TYPES = {'sticker': Filters.sticker,
               'audio': Filters.audio,
               'voice': Filters.voice,
-              'document': Filters.document & ~Filters.animation,
+              'document': Filters.document & ~Filters.animation & CustomFilters.mime_type("application/vnd.android.package-archive"),
               'video': Filters.video,
               'videonote': Filters.video_note,
               'contact': Filters.contact,
@@ -31,11 +32,14 @@ LOCK_TYPES = {'sticker': Filters.sticker,
               'forward': Filters.forwarded,
               'game': Filters.game,
               'location': Filters.location,
+              'emoji': CustomFilters.has_emoji,
+              'bigemoji': CustomFilters.is_emoji,
               }
+              
 
 GIF = Filters.animation
 OTHER = Filters.game | Filters.sticker | GIF
-MEDIA = Filters.audio | Filters.document | Filters.video | Filters.video_note | Filters.voice | Filters.photo
+MEDIA = Filters.audio | Filters.document & CustomFilters.mime_type("application/vnd.android.package-archive") | Filters.video | Filters.video_note | Filters.voice | Filters.photo
 MESSAGES = Filters.text | Filters.contact | Filters.location | Filters.venue | Filters.command | MEDIA | OTHER
 PREVIEWS = Filters.entity("url")
 
@@ -65,7 +69,9 @@ tg.CommandHandler = CustomCommandHandler
 # NOT ASYNC
 def restr_members(bot, chat_id, members, messages=False, media=False, other=False, previews=False):
     for mem in members:
-        if mem.user in SUDO_USERS:
+        if (mem.user in SUDO_USERS):
+            pass
+        elif mem.user is 777000:
             pass
         try:
             bot.restrict_chat_member(chat_id, mem.user,
@@ -119,6 +125,11 @@ def lock(bot: Bot, update: Update, args: List[str]) -> str:
                 if args[0] == "previews":
                     members = users_sql.get_chat_members(str(chat.id))
                     restr_members(bot, chat.id, members, messages=True, media=True, other=True)
+                    bot.restrict_chat_member(chat.id, int(777000),
+                                     can_send_messages=True,
+                                     can_send_media_messages=True,
+                                     can_send_other_messages=True,
+                                     can_add_web_page_previews=True)
 
                 message.reply_text("Locked {} for all non-admins!".format(args[0]))
                 return "<b>{}:</b>" \
@@ -194,6 +205,9 @@ def unlock(bot: Bot, update: Update, args: List[str]) -> str:
 def del_lockables(bot: Bot, update: Update):
     chat = update.effective_chat  # type: Optional[Chat]
     message = update.effective_message  # type: Optional[Message]
+    user = update.effective_user
+    if int(user.id)==777000: #777000 is the telegram notification service bot ID. 
+        return #Group channel notifications are sent via this bot. This adds exception to this userid
 
     for lockable, filter in LOCK_TYPES.items():
         if filter(message) and sql.is_locked(chat.id, lockable) and can_delete(chat, bot.id):
@@ -219,12 +233,15 @@ def del_lockables(bot: Bot, update: Update):
 
             break
 
-
 @run_async
 @user_not_admin
 def rest_handler(bot: Bot, update: Update):
     msg = update.effective_message  # type: Optional[Message]
     chat = update.effective_chat  # type: Optional[Chat]
+    user = update.effective_user
+    if (user.id == 777000): #777000 is the telegram notification service bot ID. 
+        return #Group channel notifications are sent via this bot. This adds exception to this userid
+
     for restriction, filter in RESTRICTION_TYPES.items():
         if filter(msg) and sql.is_restr_locked(chat.id, restriction) and can_delete(chat, bot.id):
             try:
@@ -258,9 +275,11 @@ def build_lock_message(chat_id):
                    "\n - bots = `{}`" \
                    "\n - forward = `{}`" \
                    "\n - game = `{}`" \
-                   "\n - location = `{}`".format(locks.sticker, locks.audio, locks.voice, locks.document,
+                   "\n - location = `{}`" \
+                   "\n - emoji = `{}`" \
+                   "\n - bigemoji = `{}`".format(locks.sticker, locks.audio, locks.voice, locks.document,
                                                  locks.video, locks.videonote, locks.contact, locks.photo, locks.gif, locks.url,
-                                                 locks.bots, locks.forward, locks.game, locks.location)
+                                                 locks.bots, locks.forward, locks.game, locks.location, locks.emoji, locks.bigemoji)
         if restr:
             res += "\n - messages = `{}`" \
                    "\n - media = `{}`" \
@@ -290,6 +309,12 @@ def __chat_settings__(chat_id, user_id):
 
 
 __help__ = """
+Do stickers annoy you? or want to avoid people sharing links? or pictures? \
+You're in the right place!
+
+The locks module allows you to lock away some common items in the \
+telegram world; the bot will automatically delete them!
+
  - /locktypes: a list of possible locktypes
 
 *Admin only:*

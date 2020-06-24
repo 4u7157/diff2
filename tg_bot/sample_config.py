@@ -20,7 +20,7 @@ class Config(object):
     LOAD = []
     # sed has been disabled after the discovery that certain long-running sed commands maxed out cpu usage
     # and killed the bot. Be careful re-enabling it!
-    NO_LOAD = ['translation', 'rss', 'sed']
+    NO_LOAD = ['translation', 'rss', 'weather', 'sed']
     WEBHOOK = False
     URL = None
 
@@ -33,9 +33,13 @@ class Config(object):
     PORT = 5000
     DEL_CMDS = False  # Whether or not you should delete "blue text must click" commands
     STRICT_GBAN = False
+    STRICT_GMUTE = False
     WORKERS = 8  # Number of subthreads to use. This is the recommended amount - see for yourself what works best!
-    BAN_STICKER = 'CAADAgADOwADPPEcAXkko5EB3YGYAg'  # banhammer marie sticker
+    BAN_STICKER = 'CAADAgADOwADPPEcAXkko5EB3YGYAg'  # ban sticker
+    START_STICKER = False #add a START_STICKER_ID = 'stickerid' in your config.py if you use this as true
+    START_STICKER_ID = 'CAADAgAD0QMAAjq5FQKizo2AiTQCBQI' #putin hand sticker
     ALLOW_EXCL = False  # Allow ! commands as well as /
+    API_OPENWEATHER = None # OpenWeather API
 
 
 class Production(Config):

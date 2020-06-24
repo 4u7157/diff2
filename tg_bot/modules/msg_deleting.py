@@ -1,4 +1,4 @@
-import html
+import html, time
 from typing import Optional, List
 
 from telegram import Message, Chat, Update, Bot, User
@@ -50,7 +50,9 @@ def purge(bot: Bot, update: Update, args: List[str]) -> str:
                 elif err.message != "Message to delete not found":
                     LOGGER.exception("Error while purging chat messages.")
 
-            bot.send_message(chat.id, "Purge complete.")
+            del_msg = bot.send_message(chat.id, "Purge complete.")
+            time.sleep(5)
+            del_msg.delete()
             return "<b>{}:</b>" \
                    "\n#PURGE" \
                    "\n<b>Admin:</b> {}" \
@@ -86,6 +88,9 @@ def del_message(bot: Bot, update: Update) -> str:
 
 
 __help__ = """
+Deleting messages made easy with this command. Bot purges \
+messages all together or individually.
+
 *Admin only:*
  - /del: deletes the message you replied to
  - /purge: deletes all messages between this and the replied to message.

@@ -18,21 +18,21 @@ from tg_bot.modules.helper_funcs.string_handling import split_quotes, button_mar
 from tg_bot.modules.sql import cust_filters_sql as sql
 
 HANDLER_GROUP = 10
-BASIC_FILTER_STRING = "*Filters in this chat:*\n"
+BASIC_FILTER_STRING = "*List of filters in {}:*\n"
 
 
 @run_async
 def list_handlers(bot: Bot, update: Update):
     chat = update.effective_chat  # type: Optional[Chat]
     all_handlers = sql.get_chat_triggers(chat.id)
-
+    chat_name = chat.title or chat.first or chat.username
     if not all_handlers:
         update.effective_message.reply_text("No filters are active here!")
         return
 
     filter_list = BASIC_FILTER_STRING
     for keyword in all_handlers:
-        entry = " - {}\n".format(escape_markdown(keyword))
+        entry = " • `{}`\n".format((keyword))
         if len(entry) + len(filter_list) > telegram.MAX_MESSAGE_LENGTH:
             update.effective_message.reply_text(filter_list, parse_mode=telegram.ParseMode.MARKDOWN)
             filter_list = entry
@@ -40,7 +40,7 @@ def list_handlers(bot: Bot, update: Update):
             filter_list += entry
 
     if not filter_list == BASIC_FILTER_STRING:
-        update.effective_message.reply_text(filter_list, parse_mode=telegram.ParseMode.MARKDOWN)
+        update.effective_message.reply_text(filter_list.format(chat_name), parse_mode=telegram.ParseMode.MARKDOWN)
 
 
 # NOT ASYNC BECAUSE DISPATCHER HANDLER RAISED
@@ -112,8 +112,8 @@ def filters(bot: Bot, update: Update):
 
     sql.add_filter(chat.id, keyword, content, is_sticker, is_document, is_image, is_audio, is_voice, is_video,
                    buttons)
-
-    msg.reply_text("Handler '{}' added!".format(keyword))
+                   
+    update.effective_message.reply_text("Filter has been saved for '`{}`'.".format(keyword), parse_mode=ParseMode.MARKDOWN)
     raise DispatcherHandlerStop
 
 
@@ -135,7 +135,7 @@ def stop_filter(bot: Bot, update: Update):
     for keyword in chat_filters:
         if keyword == args[1]:
             sql.remove_filter(chat.id, args[1])
-            update.effective_message.reply_text("Yep, I'll stop replying to that.")
+            update.effective_message.reply_text("Removed '`{}`', I will no longer reply to that!".format(keyword), parse_mode=ParseMode.MARKDOWN)
             raise DispatcherHandlerStop
 
     update.effective_message.reply_text("That's not a current filter - run /filters for all active filters.")
@@ -179,14 +179,14 @@ def reply_filter(bot: Bot, update: Update):
                     if excp.message == "Unsupported url protocol":
                         message.reply_text("You seem to be trying to use an unsupported url protocol. Telegram "
                                            "doesn't support buttons for some protocols, such as tg://. Please try "
-                                           "again, or ask in @MarieSupport for help.")
+                                           "again, or ask in @bot_workshop for help.")
                     elif excp.message == "Reply message not found":
                         bot.send_message(chat.id, filt.reply, parse_mode=ParseMode.MARKDOWN,
                                          disable_web_page_preview=True,
                                          reply_markup=keyboard)
                     else:
                         message.reply_text("This note could not be sent, as it is incorrectly formatted. Ask in "
-                                           "@MarieSupport if you can't figure out why!")
+                                           "@bot_workshop if you can't figure out why!")
                         LOGGER.warning("Message %s could not be parsed", str(filt.reply))
                         LOGGER.exception("Could not parse filter %s in chat %s", str(filt.keyword), str(chat.id))
 
@@ -210,15 +210,27 @@ def __chat_settings__(chat_id, user_id):
 
 
 __help__ = """
+Make your chat more lively with filters; The bot will reply to certain words!
+
+Filters are case insensitive; every time someone says your trigger words, {} will reply something else! can be used to create your own commands, if desired.
+
  - /filters: list all active filters in this chat.
 
 *Admin only:*
- - /filter <keyword> <reply message>: add a filter to this chat. The bot will now reply that message whenever 'keyword'\
-is mentioned. If you reply to a sticker with a keyword, the bot will reply with that sticker. NOTE: all filter \
-keywords are in lowercase. If you want your keyword to be a sentence, use quotes. eg: /filter "hey there" How you \
-doin?
+ - /filter <keyword> <reply message>: Every time someone says "word", the bot will reply with "sentence". For multiple word filters, quote the first word.
  - /stop <filter keyword>: stop that filter.
-"""
+ 
+ An example of how to set a filter would be via:
+`/filter hello Hello there! How are you?`
+
+A multiword filter could be set via:
+`/filter "hello friend" Hello back! Long time no see!`
+
+If you want to save an image, gif, or sticker, or any other data, do the following:
+`/filter word while replying to a sticker or whatever data you'd like. Now, every time someone mentions "word", that sticker will be sent as a reply.`
+
+Now, anyone saying "hello" will be replied to with "Hello there! How are you?".
+""".format(dispatcher.bot.first_name)
 
 __mod_name__ = "Filters"
 

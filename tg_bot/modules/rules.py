@@ -8,6 +8,7 @@ from telegram.utils.helpers import escape_markdown
 
 import tg_bot.modules.sql.rules_sql as sql
 from tg_bot import dispatcher
+from tg_bot.modules.disable import DisableAbleCommandHandler
 from tg_bot.modules.helper_funcs.chat_status import user_admin
 from tg_bot.modules.helper_funcs.string_handling import markdown_parser
 
@@ -94,16 +95,22 @@ def __chat_settings__(chat_id, user_id):
 
 
 __help__ = """
+Every chat works with different rules; this module will help make those rules clearer!
+
  - /rules: get the rules for this chat.
 
 *Admin only:*
  - /setrules <your rules here>: set the rules for this chat.
  - /clearrules: clear the rules for this chat.
-"""
+ 
+ *Important*
+ By default rules are sent to PM of the user that sends the command. 
+ If you want the rules to be sent in the group (more spam but as you wish), you can use `/disable rules` command for your group and set them with custom filters ( `/filter /rules random rules`)
+ """
 
 __mod_name__ = "Rules"
 
-GET_RULES_HANDLER = CommandHandler("rules", get_rules, filters=Filters.group)
+GET_RULES_HANDLER = DisableAbleCommandHandler("rules", get_rules, filters=Filters.group)
 SET_RULES_HANDLER = CommandHandler("setrules", set_rules, filters=Filters.group)
 RESET_RULES_HANDLER = CommandHandler("clearrules", clear_rules, filters=Filters.group)
 

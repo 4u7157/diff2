@@ -27,7 +27,7 @@ def promote(bot: Bot, update: Update, args: List[str]) -> str:
     user = update.effective_user  # type: Optional[User]
 
     user_id = extract_user(message, args)
-    if not user_id:
+    if not user_id or int(user_id) == 777000:
         message.reply_text("You don't seem to be referring to a user.")
         return ""
 
@@ -73,7 +73,7 @@ def demote(bot: Bot, update: Update, args: List[str]) -> str:
     user = update.effective_user  # type: Optional[User]
 
     user_id = extract_user(message, args)
-    if not user_id:
+    if not user_id or int(user_id) == 777000:
         message.reply_text("You don't seem to be referring to a user.")
         return ""
 
@@ -190,15 +190,30 @@ def invite(bot: Bot, update: Update):
 @run_async
 def adminlist(bot: Bot, update: Update):
     administrators = update.effective_chat.get_administrators()
-    text = "Admins in *{}*:".format(update.effective_chat.title or "this chat")
+    msg = update.effective_message
+    text = "Members of *{}*:".format(update.effective_chat.title or "this chat")
     for admin in administrators:
         user = admin.user
-        name = "[{}](tg://user?id={})".format(user.first_name + (user.last_name or ""), user.id)
+        status = admin.status
+        name = "[{}](tg://user?id={})".format(user.first_name + " " + (user.last_name or ""), user.id)
         if user.username:
             name = escape_markdown("@" + user.username)
-        text += "\n - {}".format(name)
+        if status == "creator":
+            text += "\n *Creator:*"
+            text += "\n`🤴🏻 `{} \n\n *Administrators:*".format(name)
+    for admin in administrators:
+        user = admin.user
+        status = admin.status
+        chat = update.effective_chat
+        count = chat.get_members_count()
+        name = "[{}](tg://user?id={})".format(user.first_name + " " + (user.last_name or ""), user.id)
+        if user.username:
+            name = escape_markdown("@" + user.username)
+        if status == "administrator":
+            text += "\n`👮🏻 `{}".format(name)
+            members = "\n\n*Members:*\n`🙎🏻‍♂️ ` {} users".format(count)
 
-    update.effective_message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+    msg.reply_text(text + members, parse_mode=ParseMode.MARKDOWN)
 
 
 def __chat_settings__(chat_id, user_id):
@@ -207,14 +222,23 @@ def __chat_settings__(chat_id, user_id):
 
 
 __help__ = """
- - /adminlist: list of admins in the chat
+Lazy to promote or demote someone for admins? Want to see basic information about chat? \
+All stuff about chatroom such as admin lists, pinning or grabbing an invite link can be \
+done easily using the bot.
+
+ - /adminlist: list of admins and members in the chat
+ - /staff: same as /adminlist
 
 *Admin only:*
- - /pin: silently pins the message replied to - add 'loud' or 'notify' to give notifs to users.
+ - /pin: silently pins the message replied to - add 'loud' or 'notify' to give notifies to users.
  - /unpin: unpins the currently pinned message
  - /invitelink: gets invitelink
+ - /link: same as /invitelink
  - /promote: promotes the user replied to
  - /demote: demotes the user replied to
+
+An example of promoting someone to admins:
+`/promote @username`; this promotes a user to admins.
 """
 
 __mod_name__ = "Admin"
@@ -222,12 +246,12 @@ __mod_name__ = "Admin"
 PIN_HANDLER = CommandHandler("pin", pin, pass_args=True, filters=Filters.group)
 UNPIN_HANDLER = CommandHandler("unpin", unpin, filters=Filters.group)
 
-INVITE_HANDLER = CommandHandler("invitelink", invite, filters=Filters.group)
+INVITE_HANDLER = CommandHandler(["invitelink", "link"], invite, filters=Filters.group)
 
 PROMOTE_HANDLER = CommandHandler("promote", promote, pass_args=True, filters=Filters.group)
 DEMOTE_HANDLER = CommandHandler("demote", demote, pass_args=True, filters=Filters.group)
 
-ADMINLIST_HANDLER = DisableAbleCommandHandler("adminlist", adminlist, filters=Filters.group)
+ADMINLIST_HANDLER = DisableAbleCommandHandler(["adminlist", "staff"], adminlist, filters=Filters.group)
 
 dispatcher.add_handler(PIN_HANDLER)
 dispatcher.add_handler(UNPIN_HANDLER)

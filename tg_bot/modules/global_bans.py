@@ -2,7 +2,7 @@ import html
 from io import BytesIO
 from typing import Optional, List
 
-from telegram import Message, Update, Bot, User, Chat, ParseMode
+from telegram import Message, Update, Bot, User, Chat, ParseMode, InlineKeyboardMarkup
 from telegram.error import BadRequest, TelegramError
 from telegram.ext import run_async, CommandHandler, MessageHandler, Filters
 from telegram.utils.helpers import mention_html
@@ -18,44 +18,58 @@ from tg_bot.modules.sql.users_sql import get_all_chats
 GBAN_ENFORCE_GROUP = 6
 
 GBAN_ERRORS = {
-    "User is an administrator of the chat",
-    "Chat not found",
-    "Not enough rights to restrict/unrestrict chat member",
-    "User_not_participant",
-    "Peer_id_invalid",
-    "Group chat was deactivated",
-    "Need to be inviter of a user to kick it from a basic group",
-    "Chat_admin_required",
-    "Only the creator of a basic group can kick group administrators",
+    "Bots can't add new chat members",
     "Channel_private",
-    "Not in the chat"
+    "Chat not found",
+    "Can't demote chat creator",
+    "Chat_admin_required",
+    "Group chat was deactivated",
+    "Method is available for supergroup and channel chats only",
+    "Method is available only for supergroups",
+    "Need to be inviter of a user to kick it from a basic group",
+    "Not enough rights to restrict/unrestrict chat member",
+    "Not in the chat",
+    "Only the creator of a basic group can kick group administrators",
+    "Peer_id_invalid",
+    "User is an administrator of the chat",
+    "User_not_participant",
+    "Reply message not found",
+    "Can't remove chat owner"
 }
 
 UNGBAN_ERRORS = {
-    "User is an administrator of the chat",
-    "Chat not found",
-    "Not enough rights to restrict/unrestrict chat member",
-    "User_not_participant",
-    "Method is available for supergroup and channel chats only",
-    "Not in the chat",
+    "Bots can't add new chat members",
     "Channel_private",
+    "Chat not found",
+    "Can't demote chat creator",
     "Chat_admin_required",
+    "Group chat was deactivated",
+    "Method is available for supergroup and channel chats only",
+    "Method is available only for supergroups",
+    "Need to be inviter of a user to kick it from a basic group",
+    "Not enough rights to restrict/unrestrict chat member",
+    "Not in the chat",
+    "Only the creator of a basic group can kick group administrators",
     "Peer_id_invalid",
+    "User is an administrator of the chat",
+    "User_not_participant",
+    "Reply message not found",
+    "User not found"
 }
 
 
 @run_async
 def gban(bot: Bot, update: Update, args: List[str]):
     message = update.effective_message  # type: Optional[Message]
-
+    user = update.effective_user  # type: Optional[User]
     user_id, reason = extract_user_and_text(message, args)
 
-    if not user_id:
+    if not user_id or int(user_id)==777000:
         message.reply_text("You don't seem to be referring to a user.")
         return
 
     if int(user_id) in SUDO_USERS:
-        message.reply_text("I spy, with my little eye... a sudo user war! Why are you guys turning on each other?")
+        message.reply_text("Now kiss each other!")
         return
 
     if int(user_id) in SUPPORT_USERS:
@@ -63,7 +77,7 @@ def gban(bot: Bot, update: Update, args: List[str]):
         return
 
     if user_id == bot.id:
-        message.reply_text("-_- So funny, lets gban myself why don't I? Nice try.")
+        message.reply_text("Lets gban myself why don't I? Good one.")
         return
 
     try:
@@ -82,24 +96,59 @@ def gban(bot: Bot, update: Update, args: List[str]):
             return
 
         old_reason = sql.update_gban_reason(user_id, user_chat.username or user_chat.first_name, reason)
+        user_id, new_reason = extract_user_and_text(message, args)
         if old_reason:
+            banner = update.effective_user  # type: Optional[User]
+            send_to_list(bot, SUDO_USERS + SUPPORT_USERS,
+                     "<b>Emendation of Global Ban</b>" \
+                     "\n#GBAN" \
+                     "\n<b>Status:</b> <code>Amended</code>" \
+                     "\n<b>Sudo Admin:</b> {}" \
+                     "\n<b>User:</b> {}" \
+                     "\n<b>ID:</b> <code>{}</code>" \
+                     "\n<b>Previous Reason:</b> {}" \
+                     "\n<b>Amended Reason:</b> {}".format(mention_html(banner.id, banner.first_name),
+                                              mention_html(user_chat.id, user_chat.first_name or "Deleted Account"), 
+                                                           user_chat.id, old_reason, new_reason), 
+                    html=True)
+                
             message.reply_text("This user is already gbanned, for the following reason:\n"
                                "<code>{}</code>\n"
                                "I've gone and updated it with your new reason!".format(html.escape(old_reason)),
                                parse_mode=ParseMode.HTML)
         else:
+            banner = update.effective_user  # type: Optional[User]
+            send_to_list(bot, SUDO_USERS + SUPPORT_USERS,
+                     "<b>Emendation of Global Ban</b>" \
+                     "\n#GBAN" \
+                     "\n<b>Status:</b> <code>New reason</code>" \
+                     "\n<b>Sudo Admin:</b> {}" \
+                     "\n<b>User:</b> {}" \
+                     "\n<b>ID:</b> <code>{}</code>" \
+                     "\n<b>New Reason:</b> {}".format(mention_html(banner.id, banner.first_name),
+                                              mention_html(user_chat.id, user_chat.first_name or "Deleted Account"), 
+                                                           user_chat.id, new_reason), 
+                    html=True)
             message.reply_text("This user is already gbanned, but had no reason set; I've gone and updated it!")
 
         return
 
-    message.reply_text("*Blows dust off of banhammer* 😉")
-
+    starting = "Initiating global ban for {}...".format(mention_html(user_chat.id, user_chat.first_name or "Deleted Account"))
+    keyboard = []
+    # message.reply_text(starting, reply_markup=keyboard, parse_mode=ParseMode.HTML)
+    
     banner = update.effective_user  # type: Optional[User]
     send_to_list(bot, SUDO_USERS + SUPPORT_USERS,
-                 "{} is gbanning user {} "
-                 "because:\n{}".format(mention_html(banner.id, banner.first_name),
-                                       mention_html(user_chat.id, user_chat.first_name), reason or "No reason given"),
-                 html=True)
+                 "<b>Global Ban</b>" \
+                 "\n#GBAN" \
+                 "\n<b>Status:</b> <code>Enforcing</code>" \
+                 "\n<b>Sudo Admin:</b> {}" \
+                 "\n<b>User:</b> {}" \
+                 "\n<b>ID:</b> <code>{}</code>" \
+                 "\n<b>Reason:</b> {}".format(mention_html(banner.id, banner.first_name),
+                                              mention_html(user_chat.id, user_chat.first_name or "Deleted Account"), 
+                                                           user_chat.id, reason or "No reason given"), 
+                html=True)
 
     sql.gban_user(user_id, user_chat.username or user_chat.first_name, reason)
 
@@ -124,7 +173,9 @@ def gban(bot: Bot, update: Update, args: List[str]):
         except TelegramError:
             pass
 
-    send_to_list(bot, SUDO_USERS + SUPPORT_USERS, "gban complete!")
+    send_to_list(bot, SUDO_USERS + SUPPORT_USERS, 
+                  "{} has been successfully gbanned!".format(mention_html(user_chat.id, user_chat.first_name or "Deleted Account")),
+                html=True)
     message.reply_text("Person has been gbanned.")
 
 
@@ -133,7 +184,7 @@ def ungban(bot: Bot, update: Update, args: List[str]):
     message = update.effective_message  # type: Optional[Message]
 
     user_id = extract_user(message, args)
-    if not user_id:
+    if not user_id or int(user_id)==777000:
         message.reply_text("You don't seem to be referring to a user.")
         return
 
@@ -148,11 +199,17 @@ def ungban(bot: Bot, update: Update, args: List[str]):
 
     banner = update.effective_user  # type: Optional[User]
 
-    message.reply_text("I'll give {} a second chance, globally.".format(user_chat.first_name))
+    # message.reply_text("{}, will be unbanned globally.".format(user_chat.first_name or "Deleted Account"))
 
     send_to_list(bot, SUDO_USERS + SUPPORT_USERS,
-                 "{} has ungbanned user {}".format(mention_html(banner.id, banner.first_name),
-                                                   mention_html(user_chat.id, user_chat.first_name)),
+                 "<b>Regression of Global Ban</b>" \
+                 "\n#UNGBAN" \
+                 "\n<b>Status:</b> <code>Ceased</code>" \
+                 "\n<b>Sudo Admin:</b> {}" \
+                 "\n<b>User:</b> {}" \
+                 "\n<b>ID:</b> <code>{}</code>".format(mention_html(banner.id, banner.first_name),
+                                                       mention_html(user_chat.id, user_chat.first_name or "Deleted Account"), 
+                                                                    user_chat.id),
                  html=True)
 
     chats = get_all_chats()
@@ -180,7 +237,10 @@ def ungban(bot: Bot, update: Update, args: List[str]):
 
     sql.ungban_user(user_id)
 
-    send_to_list(bot, SUDO_USERS + SUPPORT_USERS, "un-gban complete!")
+    send_to_list(bot, SUDO_USERS + SUPPORT_USERS, 
+                  "{} has been unbanned globally!".format(mention_html(user_chat.id, 
+                                                                         user_chat.first_name or "Deleted Account")),
+                  html=True)
 
     message.reply_text("Person has been un-gbanned.")
 
@@ -202,14 +262,14 @@ def gbanlist(bot: Bot, update: Update):
     with BytesIO(str.encode(banfile)) as output:
         output.name = "gbanlist.txt"
         update.effective_message.reply_document(document=output, filename="gbanlist.txt",
-                                                caption="Here is the list of currently gbanned users.")
+                                                caption="Here is the list of currently globally banned users.")
 
 
 def check_and_ban(update, user_id, should_message=True):
     if sql.is_user_gbanned(user_id):
         update.effective_chat.kick_member(user_id)
         if should_message:
-            update.effective_message.reply_text("This is a bad person, they shouldn't be here!")
+            update.effective_message.reply_text("This user was globally banned by my owner or one of my sudo/support users so it shouldn't be here!")
 
 
 @run_async
@@ -261,15 +321,19 @@ def __stats__():
 
 def __user_info__(user_id):
     is_gbanned = sql.is_user_gbanned(user_id)
-
-    text = "Globally banned: <b>{}</b>"
-    if is_gbanned:
-        text = text.format("Yes")
-        user = sql.get_gbanned_user(user_id)
-        if user.reason:
-            text += "\nReason: {}".format(html.escape(user.reason))
+    
+    if int(user_id) in SUDO_USERS or int(user_id) in SUPPORT_USERS:
+        text="Globally banned: <b>No</b> (Immortal)"
     else:
-        text = text.format("No")
+        text = "Globally banned: <b>{}</b>"
+        if is_gbanned:
+            text = text.format("Yes")
+            user = sql.get_gbanned_user(user_id)
+            if user.reason:
+                text += "\nReason: {}".format(html.escape(user.reason))
+        else:
+            text = text.format("No")
+    
     return text
 
 
